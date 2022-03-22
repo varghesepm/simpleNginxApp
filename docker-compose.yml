@@ -1,0 +1,56 @@
+version: "3"
+services:
+  web:
+    image: nginx:1.21.6-alpine
+    container_name: nginx
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/html/index.html:/usr/share/nginx/html/index.html
+      - ./nginx/logs/access.log:/var/log/nginx/localhost.access.log
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
+
+  mongodb:
+    container_name: mongodb
+    image: mongo:5.0.6
+    hostname: mongo-server
+    restart: unless-stopped
+    tty: true
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: $MONGO_ROOT_USER
+      MONGO_INITDB_ROOT_PASSWORD: $MONGO_ROOT_PASS
+      APP_USER: $MONGO_APP_USER
+      APP_PWD: $MONGO_APP_PASS
+      DB_NAME: $MONGO_DB
+      DB_COLLECTION_NAME: $MONGO_COL
+      MONGO_HOSTNAME: mongo-server
+    volumes:
+      - ./mongodb/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    ports:
+      - "27017:27017"
+
+  fluentd:
+    container_name: fluentd
+    image: mmebin/fluent-mongo:01
+    restart: unless-stopped
+    hostname: fluend
+    ports:
+      - 1514:1514/udp
+      - 24224:24224
+    volumes:
+      - ./fluentd/fluent.conf:/fluentd/etc/fluent.conf
+      - ./nginx/logs/:/var/log/nginx
+    links:
+      - mongodb
+  
+  notify_app:
+   container_name: notify_app
+   image: mmebin/ebot-app:01
+   hostname: notify_app
+   restart: unless-stopped
+   ports:
+     - 8080:8080
+   links:
+     - mongodb
